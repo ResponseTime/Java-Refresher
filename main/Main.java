@@ -4,17 +4,17 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 import java.io.BufferedInputStream;
-import java.io.BufferedReader;
+import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileReader;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.net.URI;
+import java.net.URLDecoder;
 import java.net.http.*;
 import java.nio.file.Files;
-
 import com.sun.net.httpserver.*;
 
 public class Main {
@@ -48,6 +48,37 @@ public class Main {
           }
         }
       });
+
+      hs.createContext("/upload-service", new HttpHandler() {
+        public void handle(HttpExchange exchange) throws IOException {
+          byte[] Buffer = new byte[8192];
+          String query = exchange.getRequestURI().getQuery();
+          String fileName = null;
+          if (query != null) {
+            for (String param : query.split("&")) {
+              String[] pair = param.split("=");
+              if (pair.length == 2 && pair[0].equals("file")) {
+                fileName = URLDecoder.decode(pair[1], "UTF-8");
+                break;
+              }
+            }
+          }
+          File fs = new File("./" + fileName);
+          int bytesRead;
+          try (
+              BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(fs));
+              BufferedInputStream bis = new BufferedInputStream(exchange.getRequestBody());) {
+            while ((bytesRead = bis.read(Buffer)) != -1) {
+              bos.write(Buffer, 0, bytesRead);
+            }
+          }
+          exchange.sendResponseHeaders(200, 0);
+          OutputStream os = exchange.getResponseBody();
+          os.write("Upload Completed".getBytes());
+          os.close();
+        }
+      });
+
       hs.setExecutor(null);
       hs.start();
     } catch (Exception e) {
@@ -104,6 +135,7 @@ class Fetch implements Runnable {
       HttpClient client = HttpClient.newHttpClient();
       HttpRequest req = HttpRequest.newBuilder()
           .uri(URI.create(this.url))
+          .header("User-Agent", "java-program")
           .GET()
           .build();
       HttpResponse<String> res = client.send(req, HttpResponse.BodyHandlers.ofString());
