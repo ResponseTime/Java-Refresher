@@ -10,6 +10,7 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.URLDecoder;
@@ -75,6 +76,17 @@ public class Main {
           exchange.sendResponseHeaders(200, 0);
           OutputStream os = exchange.getResponseBody();
           os.write("Upload Completed".getBytes());
+          os.close();
+        }
+      });
+
+      hs.createContext("/get-ip", new HttpHandler() {
+        public void handle(HttpExchange exchange) throws IOException {
+          String ip = InetAddress.getLocalHost().getHostAddress();
+          OutputStream os = exchange.getResponseBody();
+          exchange.sendResponseHeaders(200, ip.length());
+          System.out.println(exchange.getRequestHeaders().getFirst("X-Real-IP"));
+          os.write(ip.getBytes());
           os.close();
         }
       });
